@@ -132,16 +132,7 @@
   }
 
   function markdownPlusPreviewSource(source: string): string {
-    return source
-      .split(/\r?\n/)
-      .map((line) => {
-        if (/^\s*-{3,}\s*$/.test(line)) {
-          return '<hr class="mdp-underline">';
-        }
-
-        return line;
-      })
-      .join('\n');
+    return source.replace(/^[ \t]*-{3,}[ \t]*$/gm, '\n<hr data-mdp-rule="underline">\n');
   }
 </script>
 
@@ -604,11 +595,13 @@
     color: #4fbda0;
   }
 
-  .markdown-preview :global(.mdp-underline) {
+  .markdown-preview :global([data-mdp-rule='underline']) {
+    display: block;
     height: 0;
-    margin: 0.22rem 0;
+    margin: 0.35rem 0;
     border: 0;
-    border-top: 1px solid #465466;
+    border-top: 2px solid #5d6b7c;
+    opacity: 1;
   }
 
   .empty-state {
