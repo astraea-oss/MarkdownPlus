@@ -30,7 +30,10 @@
   $: selectedId = selectedNoteSource?.id;
   $: selectedTitle = notes.find((note) => note.id === selectedId)?.title ?? 'Untitled';
   $: markdownHtml = DOMPurify.sanitize(
-    marked.parse(extractMarkdownBody(noteSource), { async: false }) as string
+    marked.parse(markdownPlusPreviewSource(extractMarkdownBody(noteSource)), {
+      async: false,
+      breaks: true
+    }) as string
   );
 
   onMount(async () => {
@@ -126,6 +129,19 @@
     }
 
     return source.slice(delimiter + 4).replace(/^\r?\n+/, '');
+  }
+
+  function markdownPlusPreviewSource(source: string): string {
+    return source
+      .split(/\r?\n/)
+      .map((line) => {
+        if (/^\s*-{3,}\s*$/.test(line)) {
+          return '<hr class="mdp-underline">';
+        }
+
+        return line;
+      })
+      .join('\n');
   }
 </script>
 
@@ -586,6 +602,13 @@
 
   .markdown-preview :global(a) {
     color: #4fbda0;
+  }
+
+  .markdown-preview :global(.mdp-underline) {
+    height: 0;
+    margin: 0.22rem 0;
+    border: 0;
+    border-top: 1px solid #465466;
   }
 
   .empty-state {

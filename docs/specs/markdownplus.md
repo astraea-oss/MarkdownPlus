@@ -23,5 +23,12 @@ Required fields:
 - `created_at`
 - `updated_at`
 
-The body remains compatible with normal Markdown for the first vertical slice.
+## Body Rendering Rules
 
+MarkdownPlus deliberately differs from regular Markdown in these first rules:
+
+- A standalone `---` line renders only as an underline/divider.
+- `---` never turns the previous line into a Setext heading.
+- Single line breaks are preserved in preview instead of collapsing source lines into one paragraph line.
+
+Use `#`, `##`, and `###` for headings.
