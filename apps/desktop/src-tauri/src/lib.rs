@@ -44,6 +44,14 @@ struct AppSettings {
     settings_anchor: String,
     #[serde(default = "default_top_tool_anchor")]
     outline_anchor: String,
+    #[serde(default = "default_notes_order")]
+    notes_order: u16,
+    #[serde(default = "default_new_note_order")]
+    new_note_order: u16,
+    #[serde(default = "default_settings_order")]
+    settings_order: u16,
+    #[serde(default = "default_outline_order")]
+    outline_order: u16,
     #[serde(default = "default_notes_hud_height")]
     notes_hud_height: u16,
     #[serde(default = "default_outline_hud_height")]
@@ -66,6 +74,10 @@ impl Default for AppSettings {
             new_note_anchor: default_top_tool_anchor(),
             settings_anchor: default_bottom_tool_anchor(),
             outline_anchor: default_top_tool_anchor(),
+            notes_order: default_notes_order(),
+            new_note_order: default_new_note_order(),
+            settings_order: default_settings_order(),
+            outline_order: default_outline_order(),
             notes_hud_height: default_notes_hud_height(),
             outline_hud_height: default_outline_hud_height(),
         }
@@ -88,6 +100,10 @@ struct AppSettingsSummary {
     new_note_anchor: String,
     settings_anchor: String,
     outline_anchor: String,
+    notes_order: u16,
+    new_note_order: u16,
+    settings_order: u16,
+    outline_order: u16,
     notes_hud_height: u16,
     outline_hud_height: u16,
 }
@@ -106,6 +122,10 @@ struct UpdateAppSettingsInput {
     new_note_anchor: String,
     settings_anchor: String,
     outline_anchor: String,
+    notes_order: u16,
+    new_note_order: u16,
+    settings_order: u16,
+    outline_order: u16,
     notes_hud_height: u16,
     outline_hud_height: u16,
 }
@@ -156,6 +176,10 @@ fn get_app_settings(state: State<'_, AppState>) -> Result<AppSettingsSummary, St
         new_note_anchor: settings.new_note_anchor,
         settings_anchor: settings.settings_anchor,
         outline_anchor: settings.outline_anchor,
+        notes_order: settings.notes_order,
+        new_note_order: settings.new_note_order,
+        settings_order: settings.settings_order,
+        outline_order: settings.outline_order,
         notes_hud_height: settings.notes_hud_height,
         outline_hud_height: settings.outline_hud_height,
     })
@@ -180,6 +204,10 @@ fn update_app_settings(
         settings.new_note_anchor = normalize_tool_anchor(&input.new_note_anchor).to_string();
         settings.settings_anchor = normalize_tool_anchor(&input.settings_anchor).to_string();
         settings.outline_anchor = normalize_tool_anchor(&input.outline_anchor).to_string();
+        settings.notes_order = input.notes_order.min(1000);
+        settings.new_note_order = input.new_note_order.min(1000);
+        settings.settings_order = input.settings_order.min(1000);
+        settings.outline_order = input.outline_order.min(1000);
         settings.notes_hud_height = input.notes_hud_height.clamp(96, 720);
         settings.outline_hud_height = input.outline_hud_height.clamp(96, 720);
     }
@@ -294,6 +322,22 @@ fn default_top_tool_anchor() -> String {
 
 fn default_bottom_tool_anchor() -> String {
     "bottom".to_string()
+}
+
+fn default_notes_order() -> u16 {
+    10
+}
+
+fn default_new_note_order() -> u16 {
+    20
+}
+
+fn default_settings_order() -> u16 {
+    30
+}
+
+fn default_outline_order() -> u16 {
+    40
 }
 
 fn default_left_dock() -> String {

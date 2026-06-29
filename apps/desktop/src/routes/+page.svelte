@@ -39,9 +39,11 @@
     label: string;
     dock: DockSide;
     anchor: ToolAnchor;
+    order: number;
   };
   type ToolDocks = Record<RibbonToolId, DockSide>;
   type ToolAnchors = Record<RibbonToolId, ToolAnchor>;
+  type ToolOrders = Record<RibbonToolId, number>;
   type ToolZone = {
     anchor: ToolAnchor;
     tools: RibbonTool[];
@@ -76,6 +78,12 @@
     settings: 'bottom',
     outline: 'top'
   };
+  const defaultToolOrders: ToolOrders = {
+    notes: 10,
+    'new-note': 20,
+    settings: 30,
+    outline: 40
+  };
   const defaultHudHeights: HudHeights = {
     notes: 320,
     outline: 190
@@ -87,6 +95,8 @@
   let rightPanelMode: PanelMode = 'view';
   let toolDocks: ToolDocks = { ...defaultToolDocks };
   let toolAnchors: ToolAnchors = { ...defaultToolAnchors };
+  let toolOrders: ToolOrders = { ...defaultToolOrders };
+  let draggingTool: RibbonToolId | null = null;
   let hudHeights: HudHeights = { ...defaultHudHeights };
   let workspacePath = '';
   let workspace: WorkspaceSummary | null = null;
@@ -106,7 +116,7 @@
   $: selectedTitle = notes.find((note) => note.id === selectedId)?.title ?? 'Untitled';
   $: leftPanelColumnWidth = leftPanelMode === 'ribbon' ? ribbonPanelWidth : leftPanelWidth;
   $: rightPanelColumnWidth = rightPanelMode === 'ribbon' ? ribbonPanelWidth : rightPanelWidth;
-  $: ribbonTools = buildRibbonTools(toolDocks, toolAnchors);
+  $: ribbonTools = buildRibbonTools(toolDocks, toolAnchors, toolOrders);
   $: leftRibbonTools = ribbonTools.filter((tool) => tool.dock === 'left');
   $: rightRibbonTools = ribbonTools.filter((tool) => tool.dock === 'right');
   $: leftToolZones = buildToolZones(leftRibbonTools);
@@ -399,27 +409,37 @@
       settings: normalizeToolAnchor(settings.settings_anchor),
       outline: normalizeToolAnchor(settings.outline_anchor)
     };
+    toolOrders = {
+      notes: settings.notes_order,
+      'new-note': settings.new_note_order,
+      settings: settings.settings_order,
+      outline: settings.outline_order
+    };
     hudHeights = {
       notes: clamp(settings.notes_hud_height, minHudHeight, maxHudHeight),
       outline: clamp(settings.outline_hud_height, minHudHeight, maxHudHeight)
     };
   }
 
-  function buildRibbonTools(docks: ToolDocks, anchors: ToolAnchors): RibbonTool[] {
+  function buildRibbonTools(docks: ToolDocks, anchors: ToolAnchors, orders: ToolOrders): RibbonTool[] {
     return [
-      { id: 'notes', label: 'Notes', dock: docks.notes, anchor: anchors.notes },
-      { id: 'new-note', label: 'New note', dock: docks['new-note'], anchor: anchors['new-note'] },
-      { id: 'settings', label: 'Settings', dock: docks.settings, anchor: anchors.settings },
-      { id: 'outline', label: 'Outline', dock: docks.outline, anchor: anchors.outline }
+      { id: 'notes', label: 'Notes', dock: docks.notes, anchor: anchors.notes, order: orders.notes },
+      { id: 'new-note', label: 'New note', dock: docks['new-note'], anchor: anchors['new-note'], order: orders['new-note'] },
+      { id: 'settings', label: 'Settings', dock: docks.settings, anchor: anchors.settings, order: orders.settings },
+      { id: 'outline', label: 'Outline', dock: docks.outline, anchor: anchors.outline, order: orders.outline }
     ];
   }
 
   function buildToolZones(tools: RibbonTool[]): ToolZone[] {
     return [
-      { anchor: 'top', tools: tools.filter((tool) => tool.anchor === 'top') },
-      { anchor: 'center', tools: tools.filter((tool) => tool.anchor === 'center') },
-      { anchor: 'bottom', tools: tools.filter((tool) => tool.anchor === 'bottom') }
+      { anchor: 'top', tools: sortTools(tools.filter((tool) => tool.anchor === 'top')) },
+      { anchor: 'center', tools: sortTools(tools.filter((tool) => tool.anchor === 'center')) },
+      { anchor: 'bottom', tools: sortTools(tools.filter((tool) => tool.anchor === 'bottom')) }
     ];
+  }
+
+  function sortTools(tools: RibbonTool[]): RibbonTool[] {
+    return [...tools].sort((first, second) => first.order - second.order || first.label.localeCompare(second.label));
   }
 
   async function setPanelMode(panel: 'left' | 'right', mode: PanelMode) {
@@ -442,29 +462,11 @@
   }
 
   async function setToolDock(tool: RibbonToolId, side: DockSide) {
-    const previousToolDocks = toolDocks;
-    toolDocks = { ...toolDocks, [tool]: side };
-
-    try {
-      await persistUiSettings();
-      status = `${toolLabel(tool)} moved to ${side} panel.`;
-    } catch (error) {
-      toolDocks = previousToolDocks;
-      status = error instanceof Error ? error.message : String(error);
-    }
+    await moveTool(tool, side, toolAnchors[tool], undefined, 'append', `${toolLabel(tool)} moved to ${side} panel.`);
   }
 
   async function setToolAnchor(tool: RibbonToolId, anchor: ToolAnchor) {
-    const previousToolAnchors = toolAnchors;
-    toolAnchors = { ...toolAnchors, [tool]: anchor };
-
-    try {
-      await persistUiSettings();
-      status = `${toolLabel(tool)} anchored ${anchor}.`;
-    } catch (error) {
-      toolAnchors = previousToolAnchors;
-      status = error instanceof Error ? error.message : String(error);
-    }
+    await moveTool(tool, toolDocks[tool], anchor, undefined, 'append', `${toolLabel(tool)} anchored ${anchor}.`);
   }
 
   async function moveToolToOppositeDock(tool: RibbonToolId) {
@@ -486,11 +488,16 @@
   }
 
   function handleRibbonDragStart(event: DragEvent, tool: RibbonToolId) {
+    draggingTool = tool;
     event.dataTransfer?.setData('text/plain', tool);
     event.dataTransfer?.setData('application/x-markdownplus-ribbon-tool', tool);
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
     }
+  }
+
+  function handleRibbonDragEnd() {
+    draggingTool = null;
   }
 
   function allowRibbonDrop(event: DragEvent) {
@@ -502,12 +509,90 @@
 
   async function handleRibbonDrop(event: DragEvent, side: DockSide) {
     event.preventDefault();
+    event.stopPropagation();
     const tool = event.dataTransfer?.getData('application/x-markdownplus-ribbon-tool')
       || event.dataTransfer?.getData('text/plain');
 
     if (isRibbonToolId(tool)) {
-      await setToolDock(tool, side);
+      await moveTool(tool, side, toolAnchors[tool], undefined, 'append', `${toolLabel(tool)} moved to ${side} panel.`);
     }
+  }
+
+  async function handleToolZoneDrop(event: DragEvent, side: DockSide, anchor: ToolAnchor) {
+    event.preventDefault();
+    event.stopPropagation();
+    const tool = getDraggedTool(event);
+
+    if (tool) {
+      await moveTool(tool, side, anchor, undefined, 'append');
+    }
+  }
+
+  async function handleToolDrop(event: DragEvent, side: DockSide, anchor: ToolAnchor, targetTool: RibbonToolId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const tool = getDraggedTool(event);
+
+    if (tool) {
+      if (tool === targetTool) return;
+
+      const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+      const placement = target && event.clientY > target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2
+        ? 'after'
+        : 'before';
+      await moveTool(tool, side, anchor, targetTool, placement);
+    }
+  }
+
+  function getDraggedTool(event: DragEvent): RibbonToolId | null {
+    const tool = event.dataTransfer?.getData('application/x-markdownplus-ribbon-tool')
+      || event.dataTransfer?.getData('text/plain');
+
+    return isRibbonToolId(tool) ? tool : null;
+  }
+
+  async function moveTool(
+    tool: RibbonToolId,
+    side: DockSide,
+    anchor: ToolAnchor,
+    targetTool: RibbonToolId | undefined,
+    placement: 'before' | 'after' | 'append',
+    successStatus = `${toolLabel(tool)} moved to ${anchor} ${side}.`
+  ) {
+    const previousToolDocks = toolDocks;
+    const previousToolAnchors = toolAnchors;
+    const previousToolOrders = toolOrders;
+    const targetTools = sortTools(ribbonTools)
+      .filter((candidate) => candidate.dock === side && candidate.anchor === anchor && candidate.id !== tool)
+      .map((candidate) => candidate.id);
+
+    if (targetTool && targetTool !== tool) {
+      const targetIndex = targetTools.indexOf(targetTool);
+      const insertAt = targetIndex === -1
+        ? targetTools.length
+        : targetIndex + (placement === 'after' ? 1 : 0);
+      targetTools.splice(insertAt, 0, tool);
+    } else {
+      targetTools.push(tool);
+    }
+
+    toolDocks = { ...toolDocks, [tool]: side };
+    toolAnchors = { ...toolAnchors, [tool]: anchor };
+    toolOrders = { ...toolOrders, ...renumberTools(targetTools) };
+
+    try {
+      await persistUiSettings();
+      status = successStatus;
+    } catch (error) {
+      toolDocks = previousToolDocks;
+      toolAnchors = previousToolAnchors;
+      toolOrders = previousToolOrders;
+      status = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  function renumberTools(toolIds: RibbonToolId[]): Partial<ToolOrders> {
+    return Object.fromEntries(toolIds.map((tool, index) => [tool, (index + 1) * 10])) as Partial<ToolOrders>;
   }
 
   function isRibbonToolId(value: string | undefined): value is RibbonToolId {
@@ -552,6 +637,10 @@
       new_note_anchor: toolAnchors['new-note'],
       settings_anchor: toolAnchors.settings,
       outline_anchor: toolAnchors.outline,
+      notes_order: toolOrders.notes,
+      new_note_order: toolOrders['new-note'],
+      settings_order: toolOrders.settings,
+      outline_order: toolOrders.outline,
       notes_hud_height: hudHeights.notes,
       outline_hud_height: hudHeights.outline
     });
@@ -734,7 +823,16 @@
         on:drop={(event) => handleRibbonDrop(event, 'left')}
       >
         {#each leftToolZones as zone}
-          <div class:center-zone={zone.anchor === 'center'} class:bottom-zone={zone.anchor === 'bottom'} class="tool-zone">
+          <div
+            class:center-zone={zone.anchor === 'center'}
+            class:bottom-zone={zone.anchor === 'bottom'}
+            class:drop-ready={Boolean(draggingTool)}
+            class="tool-zone"
+            role="group"
+            aria-label={`Left ${zone.anchor} tools`}
+            on:dragover={allowRibbonDrop}
+            on:drop={(event) => handleToolZoneDrop(event, 'left', zone.anchor)}
+          >
             {#each zone.tools as tool}
               <button
                 class:active={tool.id === 'settings' && settingsOpen}
@@ -747,6 +845,9 @@
                 on:click={() => runRibbonTool(tool.id)}
                 on:dblclick={() => moveToolToOppositeDock(tool.id)}
                 on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+                on:dragend={handleRibbonDragEnd}
+                on:dragover={allowRibbonDrop}
+                on:drop={(event) => handleToolDrop(event, 'left', zone.anchor, tool.id)}
               >
                 {#if tool.id === 'notes'}
                   <FileText size={17} />
@@ -772,9 +873,27 @@
 
       <div class="panel-tool-stack" aria-label="Left panel tools">
         {#each leftToolZones as zone}
-          <div class:center-zone={zone.anchor === 'center'} class:bottom-zone={zone.anchor === 'bottom'} class="tool-zone">
+          <div
+            class:center-zone={zone.anchor === 'center'}
+            class:bottom-zone={zone.anchor === 'bottom'}
+            class:drop-ready={Boolean(draggingTool)}
+            class="tool-zone"
+            role="group"
+            aria-label={`Left ${zone.anchor} tools`}
+            on:dragover={allowRibbonDrop}
+            on:drop={(event) => handleToolZoneDrop(event, 'left', zone.anchor)}
+          >
             {#each zone.tools as tool}
-              <section class="panel-tool-group">
+              <section
+                class="panel-tool-group"
+                role="group"
+                aria-label={tool.label}
+                draggable="true"
+                on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+                on:dragend={handleRibbonDragEnd}
+                on:dragover={allowRibbonDrop}
+                on:drop={(event) => handleToolDrop(event, 'left', zone.anchor, tool.id)}
+              >
             <div class:has-compact-action={tool.id === 'notes'} class="panel-tool-row">
               <button
                 class:active={tool.id === 'settings' && settingsOpen}
@@ -787,6 +906,7 @@
                 on:click={() => runRibbonTool(tool.id)}
                 on:dblclick={() => moveToolToOppositeDock(tool.id)}
                 on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+                on:dragend={handleRibbonDragEnd}
               >
                 {#if tool.id === 'notes'}
                   <FileText size={15} />
@@ -1109,7 +1229,16 @@
         on:drop={(event) => handleRibbonDrop(event, 'right')}
       >
         {#each rightToolZones as zone}
-          <div class:center-zone={zone.anchor === 'center'} class:bottom-zone={zone.anchor === 'bottom'} class="tool-zone">
+          <div
+            class:center-zone={zone.anchor === 'center'}
+            class:bottom-zone={zone.anchor === 'bottom'}
+            class:drop-ready={Boolean(draggingTool)}
+            class="tool-zone"
+            role="group"
+            aria-label={`Right ${zone.anchor} tools`}
+            on:dragover={allowRibbonDrop}
+            on:drop={(event) => handleToolZoneDrop(event, 'right', zone.anchor)}
+          >
             {#each zone.tools as tool}
               <button
                 class:active={tool.id === 'settings' && settingsOpen}
@@ -1122,6 +1251,9 @@
                 on:click={() => runRibbonTool(tool.id)}
                 on:dblclick={() => moveToolToOppositeDock(tool.id)}
                 on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+                on:dragend={handleRibbonDragEnd}
+                on:dragover={allowRibbonDrop}
+                on:drop={(event) => handleToolDrop(event, 'right', zone.anchor, tool.id)}
               >
                 {#if tool.id === 'notes'}
                   <FileText size={17} />
@@ -1140,9 +1272,27 @@
     {:else}
       <div class="panel-tool-stack" aria-label="Right panel tools">
         {#each rightToolZones as zone}
-          <div class:center-zone={zone.anchor === 'center'} class:bottom-zone={zone.anchor === 'bottom'} class="tool-zone">
+          <div
+            class:center-zone={zone.anchor === 'center'}
+            class:bottom-zone={zone.anchor === 'bottom'}
+            class:drop-ready={Boolean(draggingTool)}
+            class="tool-zone"
+            role="group"
+            aria-label={`Right ${zone.anchor} tools`}
+            on:dragover={allowRibbonDrop}
+            on:drop={(event) => handleToolZoneDrop(event, 'right', zone.anchor)}
+          >
             {#each zone.tools as tool}
-              <section class="panel-tool-group">
+              <section
+                class="panel-tool-group"
+                role="group"
+                aria-label={tool.label}
+                draggable="true"
+                on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+                on:dragend={handleRibbonDragEnd}
+                on:dragover={allowRibbonDrop}
+                on:drop={(event) => handleToolDrop(event, 'right', zone.anchor, tool.id)}
+              >
             <div class:has-compact-action={tool.id === 'notes'} class="panel-tool-row">
               <button
                 class:active={tool.id === 'settings' && settingsOpen}
@@ -1155,6 +1305,7 @@
                 on:click={() => runRibbonTool(tool.id)}
                 on:dblclick={() => moveToolToOppositeDock(tool.id)}
                 on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+                on:dragend={handleRibbonDragEnd}
               >
                 {#if tool.id === 'notes'}
                   <FileText size={15} />
@@ -1278,8 +1429,23 @@
     display: grid;
     align-content: start;
     gap: 0.32rem;
-    min-height: 0;
+    min-height: 1rem;
     width: 100%;
+  }
+
+  .tool-zone.drop-ready {
+    min-height: 2rem;
+    outline: 1px dashed transparent;
+    outline-offset: -2px;
+  }
+
+  .tool-zone.drop-ready:empty {
+    border-radius: 4px;
+    outline-color: #23303d;
+  }
+
+  .tool-zone.drop-ready:empty:hover {
+    outline-color: #2ea987;
   }
 
   .panel-ribbon .tool-zone {
@@ -1339,6 +1505,14 @@
     display: grid;
     gap: 0.16rem;
     min-height: 0;
+  }
+
+  .panel-tool-group[draggable='true'] {
+    cursor: grab;
+  }
+
+  .panel-tool-group[draggable='true']:active {
+    cursor: grabbing;
   }
 
   .panel-tool-row {

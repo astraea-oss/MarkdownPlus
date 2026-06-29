@@ -18,6 +18,10 @@ export type AppSettings = {
   new_note_anchor: ToolAnchor;
   settings_anchor: ToolAnchor;
   outline_anchor: ToolAnchor;
+  notes_order: number;
+  new_note_order: number;
+  settings_order: number;
+  outline_order: number;
   notes_hud_height: number;
   outline_hud_height: number;
 };
@@ -39,6 +43,10 @@ export type UpdateAppSettingsInput = {
   new_note_anchor: ToolAnchor;
   settings_anchor: ToolAnchor;
   outline_anchor: ToolAnchor;
+  notes_order: number;
+  new_note_order: number;
+  settings_order: number;
+  outline_order: number;
   notes_hud_height: number;
   outline_hud_height: number;
 };
