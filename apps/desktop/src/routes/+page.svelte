@@ -19,7 +19,15 @@
     key: string;
     value: string;
   };
+  type OutlineItem = {
+    level: number;
+    text: string;
+  };
 
+  const minLeftPanelWidth = 220;
+  const maxLeftPanelWidth = 420;
+
+  let leftPanelWidth = 285;
   let workspacePath = '';
   let workspace: WorkspaceSummary | null = null;
   let notes: NoteSummary[] = [];
@@ -36,6 +44,7 @@
 
   $: selectedId = selectedNoteSource?.id;
   $: selectedTitle = notes.find((note) => note.id === selectedId)?.title ?? 'Untitled';
+  $: outlineItems = extractOutline(extractMarkdownBody(noteSource));
   $: markdownHtml = DOMPurify.sanitize(
     marked.parse(markdownPlusPreviewSource(extractMarkdownBody(noteSource)), {
       async: false,
@@ -145,6 +154,57 @@
 
   function markdownPlusPreviewSource(source: string): string {
     return source.replace(/^[ \t]*-{3,}[ \t]*$/gm, '\n<hr data-mdp-rule="underline">\n');
+  }
+
+  function extractOutline(source: string): OutlineItem[] {
+    return source
+      .split(/\r?\n/)
+      .map((line) => line.match(/^\s*(#{1,3})\s+(.+)$/))
+      .filter((match): match is RegExpMatchArray => Boolean(match))
+      .map((match) => ({
+        level: match[1].length,
+        text: match[2].replace(/[*_`[\]]/g, '').trim()
+      }))
+      .filter((item) => item.text);
+  }
+
+  function startLeftPanelResize(event: PointerEvent) {
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startWidth = leftPanelWidth;
+    document.body.classList.add('is-resizing-panel');
+
+    const resizePanel = (moveEvent: PointerEvent) => {
+      leftPanelWidth = clamp(startWidth + moveEvent.clientX - startX, minLeftPanelWidth, maxLeftPanelWidth);
+    };
+
+    const stopResize = () => {
+      document.body.classList.remove('is-resizing-panel');
+      window.removeEventListener('pointermove', resizePanel);
+      window.removeEventListener('pointerup', stopResize);
+      window.removeEventListener('pointercancel', stopResize);
+    };
+
+    window.addEventListener('pointermove', resizePanel);
+    window.addEventListener('pointerup', stopResize);
+    window.addEventListener('pointercancel', stopResize);
+  }
+
+  function handleLeftPanelResizeKeydown(event: KeyboardEvent) {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      leftPanelWidth = clamp(leftPanelWidth - 12, minLeftPanelWidth, maxLeftPanelWidth);
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      leftPanelWidth = clamp(leftPanelWidth + 12, minLeftPanelWidth, maxLeftPanelWidth);
+    }
+  }
+
+  function clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
   }
 
   function syncLiveFieldsFromSource() {
@@ -299,7 +359,7 @@
   <title>MarkdownPlus</title>
 </svelte:head>
 
-<main class="app-shell">
+<main class="app-shell" style={`--left-panel-width: ${leftPanelWidth}px;`}>
   <aside class="sidebar">
     <div class="brand" data-tauri-drag-region>
       <div>
@@ -368,6 +428,14 @@
       </button>
     </div>
   </aside>
+
+  <button
+    class="panel-resize-handle"
+    type="button"
+    aria-label="Resize left panel"
+    on:pointerdown={startLeftPanelResize}
+    on:keydown={handleLeftPanelResizeKeydown}
+  ></button>
 
   <section class="editor">
     {#if selectedNoteSource}
@@ -483,12 +551,32 @@
       {/if}
     </footer>
   </section>
+
+  <aside class="right-panel">
+    <div class="right-panel-toolbar" data-tauri-drag-region>
+      <h2>Outline</h2>
+    </div>
+
+    {#if selectedNoteSource && outlineItems.length}
+      <nav class="outline-list" aria-label="Note outline">
+        {#each outlineItems as item}
+          <div class:level-two={item.level === 2} class:level-three={item.level === 3} class="outline-row">
+            {item.text}
+          </div>
+        {/each}
+      </nav>
+    {:else}
+      <div class="right-panel-empty">
+        No headings found.
+      </div>
+    {/if}
+  </aside>
 </main>
 
 <style>
   .app-shell {
     display: grid;
-    grid-template-columns: minmax(240px, 285px) minmax(0, 1fr);
+    grid-template-columns: var(--left-panel-width) 4px minmax(0, 1fr) minmax(210px, 255px);
     min-height: 100vh;
     max-height: 100vh;
     background: #0d1117;
@@ -498,10 +586,99 @@
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 0.72rem;
-    border-right: 1px solid #232b36;
     background: #0b0f14;
     padding: 0.72rem;
     min-height: 0;
+  }
+
+  .panel-resize-handle {
+    width: 4px;
+    min-width: 4px;
+    height: 100vh;
+    border: 0;
+    border-right: 1px solid #232b36;
+    border-left: 1px solid transparent;
+    border-radius: 0;
+    background: #0b0f14;
+    cursor: col-resize;
+    padding: 0;
+  }
+
+  .panel-resize-handle:hover,
+  .panel-resize-handle:focus {
+    border-left-color: #2ea987;
+    border-right-color: #2ea987;
+    outline: none;
+  }
+
+  :global(body.is-resizing-panel),
+  :global(body.is-resizing-panel *) {
+    cursor: col-resize !important;
+    user-select: none !important;
+  }
+
+  .right-panel {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.54rem;
+    border-left: 1px solid #232b36;
+    background: #0b0f14;
+    padding: 0.72rem 0.64rem;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .right-panel-toolbar {
+    display: flex;
+    align-items: center;
+    min-height: 1.7rem;
+  }
+
+  .right-panel-toolbar h2 {
+    margin: 0;
+    color: #d7dde4;
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+
+  .outline-list {
+    display: grid;
+    align-content: start;
+    gap: 0.08rem;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .outline-row {
+    overflow: hidden;
+    border-radius: 4px;
+    padding: 0.22rem 0.18rem;
+    color: #aeb8c4;
+    font-size: 0.76rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .outline-row.level-two {
+    padding-left: 0.76rem;
+    color: #9aa6b2;
+  }
+
+  .outline-row.level-three {
+    padding-left: 1.28rem;
+    color: #8d98a6;
+  }
+
+  .outline-row:hover {
+    background: #10161f;
+    color: #e6edf3;
+  }
+
+  .right-panel-empty {
+    color: #687586;
+    font-size: 0.76rem;
+    line-height: 1.35;
   }
 
   .brand h1 {
@@ -959,11 +1136,22 @@
   @media (max-width: 760px) {
     .app-shell {
       grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr) auto;
     }
 
     .sidebar {
       border-right: 0;
       border-bottom: 1px solid #232b36;
+    }
+
+    .panel-resize-handle {
+      display: none;
+    }
+
+    .right-panel {
+      border-top: 1px solid #232b36;
+      border-left: 0;
+      max-height: 28vh;
     }
 
   }
