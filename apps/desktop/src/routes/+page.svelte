@@ -134,6 +134,67 @@
   function markdownPlusPreviewSource(source: string): string {
     return source.replace(/^[ \t]*-{3,}[ \t]*$/gm, '\n<hr data-mdp-rule="underline">\n');
   }
+
+  function handleEditorKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    event.preventDefault();
+    const textarea = event.currentTarget as HTMLTextAreaElement;
+    const selectionStart = textarea.selectionStart;
+    const selectionEnd = textarea.selectionEnd;
+
+    if (event.shiftKey) {
+      outdentSelection(textarea, selectionStart, selectionEnd);
+      return;
+    }
+
+    indentSelection(textarea, selectionStart, selectionEnd);
+  }
+
+  function indentSelection(textarea: HTMLTextAreaElement, selectionStart: number, selectionEnd: number) {
+    const indent = '  ';
+
+    if (selectionStart === selectionEnd) {
+      noteSource =
+        noteSource.slice(0, selectionStart) + indent + noteSource.slice(selectionEnd);
+      queueSelection(textarea, selectionStart + indent.length, selectionStart + indent.length);
+      return;
+    }
+
+    const lineStart = noteSource.lastIndexOf('\n', selectionStart - 1) + 1;
+    const selected = noteSource.slice(lineStart, selectionEnd);
+    const indented = selected.replace(/^/gm, indent);
+    noteSource = noteSource.slice(0, lineStart) + indented + noteSource.slice(selectionEnd);
+    queueSelection(textarea, selectionStart + indent.length, selectionEnd + indented.length - selected.length);
+  }
+
+  function outdentSelection(textarea: HTMLTextAreaElement, selectionStart: number, selectionEnd: number) {
+    const lineStart = noteSource.lastIndexOf('\n', selectionStart - 1) + 1;
+    const selected = noteSource.slice(lineStart, selectionEnd);
+    const outdented = selected.replace(/^( {1,2}|\t)/gm, '');
+    const removedBeforeSelection = selected
+      .slice(0, selectionStart - lineStart)
+      .match(/^( {1,2}|\t)/gm)
+      ?.join('').length ?? 0;
+
+    noteSource = noteSource.slice(0, lineStart) + outdented + noteSource.slice(selectionEnd);
+
+    const removedTotal = selected.length - outdented.length;
+    queueSelection(
+      textarea,
+      Math.max(lineStart, selectionStart - removedBeforeSelection),
+      Math.max(lineStart, selectionEnd - removedTotal)
+    );
+  }
+
+  function queueSelection(textarea: HTMLTextAreaElement, start: number, end: number) {
+    requestAnimationFrame(() => {
+      textarea.selectionStart = start;
+      textarea.selectionEnd = end;
+    });
+  }
 </script>
 
 <svelte:head>
@@ -250,7 +311,12 @@
 
       <div class:preview-only={editorMode === 'preview'} class:write-only={editorMode === 'write'} class="body-shell">
         {#if editorMode !== 'preview'}
-          <textarea class="body-editor" bind:value={noteSource} aria-label="MarkdownPlus source"></textarea>
+          <textarea
+            class="body-editor"
+            bind:value={noteSource}
+            aria-label="MarkdownPlus source"
+            on:keydown={handleEditorKeydown}
+          ></textarea>
         {/if}
 
         {#if editorMode !== 'write'}
