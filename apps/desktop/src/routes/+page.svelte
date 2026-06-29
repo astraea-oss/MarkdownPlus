@@ -775,41 +775,38 @@
           <div class:center-zone={zone.anchor === 'center'} class:bottom-zone={zone.anchor === 'bottom'} class="tool-zone">
             {#each zone.tools as tool}
               <section class="panel-tool-group">
-            <button
-              class:active={tool.id === 'settings' && settingsOpen}
-              class:drag-enabled={true}
-              class="panel-tool-button"
-              aria-label={tool.label}
-              aria-disabled={tool.id === 'new-note' && !workspace}
-              title={`${tool.label} - drag to move`}
-              draggable="true"
-              on:click={() => runRibbonTool(tool.id)}
-              on:dblclick={() => moveToolToOppositeDock(tool.id)}
-              on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
-            >
+            <div class:has-compact-action={tool.id === 'notes'} class="panel-tool-row">
+              <button
+                class:active={tool.id === 'settings' && settingsOpen}
+                class:drag-enabled={true}
+                class="panel-tool-button"
+                aria-label={tool.label}
+                aria-disabled={tool.id === 'new-note' && !workspace}
+                title={`${tool.label} - drag to move`}
+                draggable="true"
+                on:click={() => runRibbonTool(tool.id)}
+                on:dblclick={() => moveToolToOppositeDock(tool.id)}
+                on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+              >
+                {#if tool.id === 'notes'}
+                  <FileText size={15} />
+                {:else if tool.id === 'new-note'}
+                  <Plus size={15} />
+                {:else if tool.id === 'settings'}
+                  <Settings size={15} />
+                {:else if tool.id === 'outline'}
+                  <ListTree size={15} />
+                {/if}
+                <span>{tool.label}</span>
+              </button>
               {#if tool.id === 'notes'}
-                <FileText size={15} />
-              {:else if tool.id === 'new-note'}
-                <Plus size={15} />
-              {:else if tool.id === 'settings'}
-                <Settings size={15} />
-              {:else if tool.id === 'outline'}
-                <ListTree size={15} />
+                <button class="compact-action" disabled={!workspace} on:click={createNewNote}>New</button>
               {/if}
-              <span>{tool.label}</span>
-            </button>
+            </div>
 
             {#if tool.id === 'notes'}
               <div class="tool-hud notes-hud" style={`height: ${hudHeights.notes}px;`}>
                 {#if workspace}
-                  <section class="notes-header">
-                    <div>
-                      <span class="count">{notes.length}</span>
-                      <span>notes</span>
-                    </div>
-                    <button on:click={createNewNote}>New</button>
-                  </section>
-
                   <nav class="notes-list" aria-label="Notes">
                     {#each notes as note}
                       <button
@@ -821,10 +818,10 @@
                         }}
                       >
                         <span class="note-title">{note.title}</span>
-                        <span class="note-meta">{note.note_type} · {new Date(note.updated_at).toLocaleString()}</span>
                       </button>
                     {/each}
                   </nav>
+                  <div class="notes-count">{notes.length} notes</div>
                 {:else}
                   <div class="sidebar-empty">Open Settings to choose a workspace.</div>
                 {/if}
@@ -1146,41 +1143,38 @@
           <div class:center-zone={zone.anchor === 'center'} class:bottom-zone={zone.anchor === 'bottom'} class="tool-zone">
             {#each zone.tools as tool}
               <section class="panel-tool-group">
-            <button
-              class:active={tool.id === 'settings' && settingsOpen}
-              class:drag-enabled={true}
-              class="panel-tool-button"
-              aria-label={tool.label}
-              aria-disabled={tool.id === 'new-note' && !workspace}
-              title={`${tool.label} - drag to move`}
-              draggable="true"
-              on:click={() => runRibbonTool(tool.id)}
-              on:dblclick={() => moveToolToOppositeDock(tool.id)}
-              on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
-            >
+            <div class:has-compact-action={tool.id === 'notes'} class="panel-tool-row">
+              <button
+                class:active={tool.id === 'settings' && settingsOpen}
+                class:drag-enabled={true}
+                class="panel-tool-button"
+                aria-label={tool.label}
+                aria-disabled={tool.id === 'new-note' && !workspace}
+                title={`${tool.label} - drag to move`}
+                draggable="true"
+                on:click={() => runRibbonTool(tool.id)}
+                on:dblclick={() => moveToolToOppositeDock(tool.id)}
+                on:dragstart={(event) => handleRibbonDragStart(event, tool.id)}
+              >
+                {#if tool.id === 'notes'}
+                  <FileText size={15} />
+                {:else if tool.id === 'new-note'}
+                  <Plus size={15} />
+                {:else if tool.id === 'settings'}
+                  <Settings size={15} />
+                {:else if tool.id === 'outline'}
+                  <ListTree size={15} />
+                {/if}
+                <span>{tool.label}</span>
+              </button>
               {#if tool.id === 'notes'}
-                <FileText size={15} />
-              {:else if tool.id === 'new-note'}
-                <Plus size={15} />
-              {:else if tool.id === 'settings'}
-                <Settings size={15} />
-              {:else if tool.id === 'outline'}
-                <ListTree size={15} />
+                <button class="compact-action" disabled={!workspace} on:click={createNewNote}>New</button>
               {/if}
-              <span>{tool.label}</span>
-            </button>
+            </div>
 
             {#if tool.id === 'notes'}
               <div class="tool-hud notes-hud" style={`height: ${hudHeights.notes}px;`}>
                 {#if workspace}
-                  <section class="notes-header">
-                    <div>
-                      <span class="count">{notes.length}</span>
-                      <span>notes</span>
-                    </div>
-                    <button on:click={createNewNote}>New</button>
-                  </section>
-
                   <nav class="notes-list" aria-label="Notes">
                     {#each notes as note}
                       <button
@@ -1192,10 +1186,10 @@
                         }}
                       >
                         <span class="note-title">{note.title}</span>
-                        <span class="note-meta">{note.note_type} · {new Date(note.updated_at).toLocaleString()}</span>
                       </button>
                     {/each}
                   </nav>
+                  <div class="notes-count">{notes.length} notes</div>
                 {:else}
                   <div class="sidebar-empty">Open Settings to choose a workspace.</div>
                 {/if}
@@ -1347,11 +1341,23 @@
     min-height: 0;
   }
 
+  .panel-tool-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .panel-tool-row.has-compact-action {
+    grid-template-columns: auto auto;
+    justify-content: start;
+  }
+
   .panel-tool-button {
     display: grid;
     grid-template-columns: 1rem minmax(0, 1fr);
     align-items: center;
-    gap: 0.42rem;
+    gap: 0.3rem;
     width: 100%;
     border-color: transparent;
     background: transparent;
@@ -1359,6 +1365,13 @@
     color: #aeb8c4;
     font-size: 0.76rem;
     text-align: left;
+  }
+
+  .compact-action {
+    min-height: 1.45rem;
+    padding: 0.18rem 0.38rem;
+    font-size: 0.72rem;
+    line-height: 1;
   }
 
   .panel-tool-button span {
@@ -1390,6 +1403,11 @@
     min-height: 0;
     overflow: hidden;
     padding: 0.22rem 0 0.08rem 1.42rem;
+  }
+
+  .notes-hud {
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 0.22rem;
   }
 
   .outline-hud {
@@ -1544,27 +1562,22 @@
     gap: 0.38rem;
   }
 
-  .notes-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    color: #aeb8c4;
-    font-size: 0.78rem;
-  }
-
-  .count {
-    font-weight: 700;
-    color: #d7dde4;
-  }
-
   .notes-list {
     display: grid;
     align-content: start;
     flex: 1 1 auto;
-    gap: 0.22rem;
+    gap: 0.12rem;
     overflow: auto;
     min-height: 0;
+  }
+
+  .notes-count {
+    overflow: hidden;
+    color: #7d8896;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .sidebar-empty {
@@ -1714,12 +1727,12 @@
 
   .note-row {
     display: grid;
-    gap: 0.16rem;
     width: 100%;
     text-align: left;
     background: #0f141b;
     border-color: transparent;
-    padding: 0.46rem 0.52rem;
+    min-height: 1.55rem;
+    padding: 0.24rem 0.38rem;
   }
 
   .note-row.active {
@@ -1732,15 +1745,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #e6edf3;
+    font-size: 0.78rem;
     font-weight: 650;
-  }
-
-  .note-meta {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #7d8896;
-    font-size: 0.72rem;
+    line-height: 1.15;
   }
 
   .editor {
