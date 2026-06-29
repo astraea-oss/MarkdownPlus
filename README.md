@@ -11,6 +11,7 @@ The current implementation is the first vertical slice:
 - `.mdp` files with YAML frontmatter and Markdown body.
 - SQLite index for note summaries and properties.
 - Basic create, list, open, edit, and save note flow.
+- Portable app settings stored beside the executable, not in AppData/XDG app folders.
 
 ## Development Prerequisites
 
@@ -40,3 +41,20 @@ workspace/
 
 Created notes are stored as `notes/<uuid>.mdp`.
 
+## Portable App Data
+
+MarkdownPlus keeps app-owned settings and runtime directories in a portable folder beside the executable:
+
+```text
+MarkdownPlusData/
+  settings/
+    settings.json
+  runtime/
+    config/
+    data/
+    cache/
+```
+
+Set `MARKDOWNPLUS_PORTABLE_HOME` before launching the app to override that folder.
+
+The selected workspace is user-owned and can live anywhere. Once selected, its path is cached in `MarkdownPlusData/settings/settings.json` and reopened automatically on the next launch.

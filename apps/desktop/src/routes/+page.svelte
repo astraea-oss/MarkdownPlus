@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import DOMPurify from 'dompurify';
   import { marked } from 'marked';
   import {
     createNote,
+    getAppSettings,
     getNoteSource,
     listNotes,
     openWorkspace,
@@ -19,6 +21,7 @@
   let selectedNoteSource: NoteSource | null = null;
   let noteSource = '';
   let status = 'Choose or type a workspace path to begin.';
+  let portableRoot = '';
   let saving = false;
   let browsing = false;
   let settingsOpen = false;
@@ -29,6 +32,24 @@
   $: markdownHtml = DOMPurify.sanitize(
     marked.parse(extractMarkdownBody(noteSource), { async: false }) as string
   );
+
+  onMount(async () => {
+    const settings = await getAppSettings();
+    portableRoot = settings.portable_root;
+
+    if (settings.last_workspace_path) {
+      workspacePath = settings.last_workspace_path;
+      try {
+        await openWorkspacePath(settings.last_workspace_path);
+      } catch (error) {
+        settingsOpen = true;
+        status = error instanceof Error ? error.message : String(error);
+      }
+    } else {
+      settingsOpen = true;
+      status = `Portable data: ${settings.portable_root}`;
+    }
+  });
 
   async function openCurrentWorkspace() {
     if (!workspacePath.trim()) {
@@ -170,6 +191,9 @@
             </button>
             <button class="primary" on:click={openCurrentWorkspace}>Open</button>
           </div>
+          {#if portableRoot}
+            <p class="settings-note">Portable app data: {portableRoot}</p>
+          {/if}
         </section>
       {/if}
 
@@ -341,6 +365,15 @@
     color: #9aa6b2;
     font-size: 0.72rem;
     font-weight: 650;
+  }
+
+  .settings-note {
+    overflow: hidden;
+    margin: 0;
+    color: #7d8896;
+    font-size: 0.68rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
   }
 
   .settings-button {

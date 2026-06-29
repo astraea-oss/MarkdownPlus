@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import type {
+  AppSettings,
   NoteDocument,
   NoteSource,
   NoteSummary,
@@ -8,6 +9,10 @@ import type {
   SaveNoteSourceInput,
   WorkspaceSummary
 } from './types';
+
+export function getAppSettings(): Promise<AppSettings> {
+  return invoke('get_app_settings');
+}
 
 export function openWorkspace(path: string): Promise<WorkspaceSummary> {
   return invoke('open_workspace', { path });

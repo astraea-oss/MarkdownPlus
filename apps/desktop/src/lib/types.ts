@@ -3,6 +3,11 @@ export type WorkspaceSummary = {
   note_count: number;
 };
 
+export type AppSettings = {
+  portable_root: string;
+  last_workspace_path: string | null;
+};
+
 export type NoteSummary = {
   id: string;
   title: string;
